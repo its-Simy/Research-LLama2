@@ -1,142 +1,182 @@
-## **Note of deprecation**
+# 🧠 Fine-Tuning LLaMA 2 for Java Tutoring
 
-Thank you for developing with Llama models. As part of the Llama 3.1 release, we’ve consolidated GitHub repos and added some additional repos as we’ve expanded Llama’s functionality into being an e2e Llama Stack. Please use the following repos going forward:
-- [llama-models](https://github.com/meta-llama/llama-models) - Central repo for the foundation models including basic utilities, model cards, license and use policies
-- [PurpleLlama](https://github.com/meta-llama/PurpleLlama) - Key component of Llama Stack focusing on safety risks and inference time mitigations 
-- [llama-toolchain](https://github.com/meta-llama/llama-toolchain) - Model development (inference/fine-tuning/safety shields/synthetic data generation) interfaces and canonical implementations
-- [llama-agentic-system](https://github.com/meta-llama/llama-agentic-system) - E2E standalone Llama Stack system, along with opinionated underlying interface, that enables creation of agentic applications
-- [llama-cookbook](https://github.com/meta-llama/llama-recipes) - Community driven scripts and integrations
+This project demonstrates how to fine-tune a LLaMA 2 language model to serve as a Java tutoring assistant using a structured, dialogue-style dataset.
 
-If you have any questions, please feel free to file an issue on any of the above repos and we will do our best to respond in a timely manner. 
+We provide all necessary scripts for training, test set extraction, and reproduction of our experiment on **Ubuntu Linux** using **Python, PyTorch, and CUDA**.
 
-Thank you!
+---
+
+## 🗂 Project Structure
+```
+.
+├── .github/ISSUE_TEMPLATE/ # Issue templates (from original LLaMA repo)
+├── llama/ # Cloned Meta LLaMA repo
+│ ├── download.sh # Downloads model weights
+│ ├── example_chat_completion.py # Optional demo script
+│ └── ... # Additional Meta scripts and modules
+├── educational-fine-tuning-data/ # Your structured dataset
+│ ├── training.json
+│ └── testing_structured_units.json
+├── qlora_finetune.py # Fine-tuning script (QLoRA, early stopping)
+├── separate_testing_data.py # Extracts reproducible test split
+├── result.py # Runs inference on structured test units
+├── requirements.txt # Python dependency list
+├── setup.py # Setup file for local module install
+├── README.md # 📄 This file
+├── Responsible-Use-Guide.pdf # From Meta – ethical use guidelines
+├── LICENSE # Meta’s model license
+├── MODEL_CARD.md # Metadata about LLaMA 2 model
+├── UPDATES.md # Version updates from Meta
+└── USE_POLICY.md # Meta's acceptable use policy
+```
 
 
-# (Deprecated) Llama 2
+---
 
-We are unlocking the power of large language models. Llama 2 is now accessible to individuals, creators, researchers, and businesses of all sizes so that they can experiment, innovate, and scale their ideas responsibly. 
+## 🖥️ System Requirements
 
-This release includes model weights and starting code for pre-trained and fine-tuned Llama language models — ranging from 7B to 70B parameters.
+- Linux (tested on **Ubuntu 22.04**)
+- Python 3.8+
+- Git
+- PyTorch with CUDA (GPU) or CPU version
+- `wget`, `md5sum`
+- (Optional) `conda` or `venv` for virtual environments
 
-This repository is intended as a minimal example to load [Llama 2](https://ai.meta.com/research/publications/llama-2-open-foundation-and-fine-tuned-chat-models/) models and run inference. For more detailed examples leveraging Hugging Face, see [llama-cookbook](https://github.com/facebookresearch/llama-recipes/).
+---
 
-## Updates post-launch
+## ⚙️ Setup Guide
 
-See [UPDATES.md](UPDATES.md). Also for a running list of frequently asked questions, see [here](https://ai.meta.com/llama/faq/).
+> 📌 If you want more step-by-step system-level instructions (e.g., installing drivers, CUDA toolkit, etc.), see our companion document:  
+> `Guide to Installing LLaMA Language Model on Linux Ubuntu`  
+> ⚠️ *Note: This guide includes some system-specific details from our own machine (`simy` user), so you may need to adapt paths and usernames to fit your setup.*
 
-## Download
+---
 
-In order to download the model weights and tokenizer, please visit the [Meta website](https://ai.meta.com/resources/models-and-libraries/llama-downloads/) and accept our License.
+### ✅ Step 1: Clone & Install LLaMA
 
-Once your request is approved, you will receive a signed URL over email. Then run the download.sh script, passing the URL provided when prompted to start the download.
-
-Pre-requisites: Make sure you have `wget` and `md5sum` installed. Then run the script: `./download.sh`.
-
-Keep in mind that the links expire after 24 hours and a certain amount of downloads. If you start seeing errors such as `403: Forbidden`, you can always re-request a link.
-
-### Access to Hugging Face
-
-We are also providing downloads on [Hugging Face](https://huggingface.co/meta-llama). You can request access to the models by acknowledging the license and filling the form in the model card of a repo. After doing so, you should get access to all the Llama models of a version (Code Llama, Llama 2, or Llama Guard) within 1 hour.
-
-## Quick Start
-
-You can follow the steps below to quickly get up and running with Llama 2 models. These steps will let you run quick inference locally. For more examples, see the [Llama 2 cookbook repository](https://github.com/facebookresearch/llama-recipes). 
-
-1. In a conda env with PyTorch / CUDA available clone and download this repository.
-
-2. In the top-level directory run:
-    ```bash
-    pip install -e .
-    ```
-3. Visit the [Meta website](https://ai.meta.com/resources/models-and-libraries/llama-downloads/) and register to download the model/s.
-
-4. Once registered, you will get an email with a URL to download the models. You will need this URL when you run the download.sh script.
-
-5. Once you get the email, navigate to your downloaded llama repository and run the download.sh script. 
-    - Make sure to grant execution permissions to the download.sh script
-    - During this process, you will be prompted to enter the URL from the email. 
-    - Do not use the “Copy Link” option but rather make sure to manually copy the link from the email.
-
-6. Once the model/s you want have been downloaded, you can run the model locally using the command below:
 ```bash
-torchrun --nproc_per_node 1 example_chat_completion.py \
+git clone https://github.com/facebookresearch/llama.git
+cd llama
+pip install -e .
+```
+
+### ✅ Step 2: Download LLaMA 2 Model Weights
+Request access from Meta AI: LLaMA Downloads
+
+Once approved, you’ll receive a signed URL.
+
+Run the download script:
+
+```
+chmod +x download.sh
+./download.sh
+```
+Enter the signed URL when prompted. The downloaded model (e.g., llama-2-7b-chat/) should be placed in your working directory.
+
+### ✅ Step 3: Fine-Tuning
+```
+torchrun --nproc_per_node 1 qlora_finetune.py \
     --ckpt_dir llama-2-7b-chat/ \
     --tokenizer_path tokenizer.model \
-    --max_seq_len 512 --max_batch_size 6
+    --max_seq_len 512 --batch_size 4
 ```
-**Note**
-- Replace  `llama-2-7b-chat/` with the path to your checkpoint directory and `tokenizer.model` with the path to your tokenizer model.
-- The `–nproc_per_node` should be set to the [MP](#inference) value for the model you are using.
-- Adjust the `max_seq_len` and `max_batch_size` parameters as needed.
-- This example runs the [example_chat_completion.py](example_chat_completion.py) found in this repository but you can change that to a different .py file.
+qlora_finetune.py is our modified training script using QLoRA with early stopping.
 
-## Inference
+Expects dataset files in educational-fine-tuning-data/.
 
-Different models require different model-parallel (MP) values:
-
-|  Model | MP |
-|--------|----|
-| 7B     | 1  |
-| 13B    | 2  |
-| 70B    | 8  |
-
-All models support sequence length up to 4096 tokens, but we pre-allocate the cache according to `max_seq_len` and `max_batch_size` values. So set those according to your hardware.
-
-### Pretrained Models
-
-These models are not finetuned for chat or Q&A. They should be prompted so that the expected answer is the natural continuation of the prompt.
-
-See `example_text_completion.py` for some examples. To illustrate, see the command below to run it with the llama-2-7b model (`nproc_per_node` needs to be set to the `MP` value):
+### ✅ Step 4: Recreate the Test Set
+To reproduce our experimental test split:
 
 ```
-torchrun --nproc_per_node 1 example_text_completion.py \
-    --ckpt_dir llama-2-7b/ \
-    --tokenizer_path tokenizer.model \
-    --max_seq_len 128 --max_batch_size 4
+python separate_testing_data.py
 ```
+This generates testing_structured_units.json using the same data split logic from training.
 
-### Fine-tuned Chat Models
-
-The fine-tuned models were trained for dialogue applications. To get the expected features and performance for them, a specific formatting defined in [`chat_completion`](https://github.com/facebookresearch/llama/blob/main/llama/generation.py#L212)
-needs to be followed, including the `INST` and `<<SYS>>` tags, `BOS` and `EOS` tokens, and the whitespaces and breaklines in between (we recommend calling `strip()` on inputs to avoid double-spaces).
-
-You can also deploy additional classifiers for filtering out inputs and outputs that are deemed unsafe. See the llama-cookbook repo for [an example](https://github.com/facebookresearch/llama-recipes/blob/main/examples/inference.py) of how to add a safety checker to the inputs and outputs of your inference code.
-
-Examples using llama-2-7b-chat:
+### ✅ Step 5: Test Inference (Optional)
+You can run model inference on the test data using:
 
 ```
-torchrun --nproc_per_node 1 example_chat_completion.py \
-    --ckpt_dir llama-2-7b-chat/ \
-    --tokenizer_path tokenizer.model \
-    --max_seq_len 512 --max_batch_size 6
+python result.py
 ```
+Ensure paths in the script match your directory layout and model files.
 
-Llama 2 is a new technology that carries potential risks with use. Testing conducted to date has not — and could not — cover all scenarios.
-In order to help developers address these risks, we have created the [Responsible Use Guide](Responsible-Use-Guide.pdf). More details can be found in our research paper as well.
 
-## Issues
+> ⚠️ **Note on Machine-Specific Settings:**  
+> The `result.py` script includes default environment variables to ensure the script runs correctly on a single machine using CPU or a single GPU:
+>
+> ```python
+> os.environ.setdefault("RANK", "0")
+> os.environ.setdefault("WORLD_SIZE", "1")
+> os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+> os.environ.setdefault("MASTER_PORT", "29500")
+> ```
+>
+> These are standard for local execution. If you run inference in a multi-GPU or distributed setting, you may need to override these with your own cluster's settings or use a launcher like `torchrun`.
 
-Please report any software “bug”, or other problems with the models through one of the following means:
-- Reporting issues with the model: [github.com/facebookresearch/llama](http://github.com/facebookresearch/llama)
-- Reporting risky content generated by the model: [developers.facebook.com/llama_output_feedback](http://developers.facebook.com/llama_output_feedback)
-- Reporting bugs and security concerns: [facebook.com/whitehat/info](http://facebook.com/whitehat/info)
+### 🧪 Dataset Format
+Each training or testing sample is stored as a multi-turn dialogue JSON object like this:
+```
+{
+  "dialogue": [
+    {
+      "from": "system",
+      "value": "You are a beginner-friendly Java professor. Respond to each student question in 3–4 clear sentences. Do not include Java code, and only use analogies when they clarify input-related or abstract behavior."
+    },
+    {
+      "from": "human",
+      "value": "How do you instantiate a Scanner object to read from the keyboard?"
+    },
+    {
+      "from": "gpt",
+      "value": "To read keyboard input, you create a Scanner object connected to the standard input stream..."
+    },
+    {
+      "from": "human",
+      "value": "How do you read an integer from the user using Scanner?"
+    },
+    {
+      "from": "gpt",
+      "value": "You use a method on the Scanner object that waits for and returns the next integer entered by the user..."
+    },
+    {
+      "from": "gpt",
+      "value": "What happens when Scanner’s nextInt() is called but the user types a word instead?\nA) It accepts the input as a string\nB) It skips the word and moves on\nC) It throws an input mismatch error\nD) It converts the word to zero"
+    },
+    {
+      "from": "human",
+      "value": "C"
+    },
+    {
+      "from": "gpt",
+      "value": "Correct! If the input doesn’t match the expected data type, Scanner throws an input mismatch exception..."
+    }
+  ]
+}
+```
+Each object in the dataset contains a dialogue array.
 
-## Model Card
-See [MODEL_CARD.md](MODEL_CARD.md).
+Turns alternate between human and gpt, optionally starting with a system message.
 
-## License
+Some sequences contain quiz-like questions followed by an answer and explanation.
+We used a format that simulates tutoring conversations and structured learning flows. Testing samples include multiple-choice practice questions following several explanation turns.
 
-Our model and weights are licensed for both researchers and commercial entities, upholding the principles of openness. Our mission is to empower individuals, and industry through this opportunity, while fostering an environment of discovery and ethical AI advancements. 
+### 📄 License & Usage
+This project uses Meta’s LLaMA 2 models under their official license agreement. You must accept their terms to download and use the model weights.
 
-See the [LICENSE](LICENSE) file, as well as our accompanying [Acceptable Use Policy](USE_POLICY.md)
+### 📚 References
+Meta LLaMA 2 Research Paper
 
-## References
+LLaMA Download Portal
 
-1. [Research Paper](https://ai.meta.com/research/publications/llama-2-open-foundation-and-fine-tuned-chat-models/)
-2. [Llama 2 technical overview](https://ai.meta.com/resources/models-and-libraries/llama)
-3. [Open Innovation AI Research Community](https://ai.meta.com/llama/open-innovation-ai-research-community/)
+### 🙋 Support
+For questions about the setup or reproducing our experiment, feel free to open an issue or reach out.
+Contact me via email: [Ramis50@farmingdale.edu](mailto:Ramis50@farmingdale.edu)
 
-For common questions, the FAQ can be found [here](https://ai.meta.com/llama/faq/) which will be kept up to date over time as new questions arise. 
+---
 
-## Original Llama
-The repo for the original llama release is in the [`llama_v1`](https://github.com/facebookresearch/llama/tree/llama_v1) branch.
+Let me know if you'd like:
+- A companion `Guide-to-Installing.txt` file for that Ubuntu setup guide.
+- A GitHub Actions CI setup to verify your scripts work.
+- A badge/banner to make the repo look more polished.
+
+I can also generate the Ubuntu setup file in `.md` or `.txt` format if you'd like it separate and cleaner.
