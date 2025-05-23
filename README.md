@@ -114,6 +114,8 @@ Ensure paths in the script match your directory layout and model files.
 > These are standard for local execution. If you run inference in a multi-GPU or distributed setting, you may need to override these with your own cluster's settings or use a launcher like `torchrun`.
 
 ### 🧪 Dataset Format
+The data used for the model came from this repository:
+https://github.com/its-Simy/educational-fine-tuning-data
 Each training or testing sample is stored as a multi-turn dialogue JSON object like this:
 ```
 {
