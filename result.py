@@ -33,7 +33,7 @@ def main(
     tokenizer_path: str = "./llama-2-7b-chat-hf/tokenizer.model",
     temperature: float = 0.6,
     top_p: float = 0.9,
-    max_seq_len: int = 1024,
+    max_seq_len: int = 4096,
     max_gen_len: int = 256,
     max_batch_size: int = 4,
 ):
@@ -72,49 +72,85 @@ def main(
             print("Goodbye!")
             break
 
-        # record student turn
         chat_history.append({"role": "user", "content": user_input})
-
-        # model generates answer based on full history
         result = generator.chat_completion(
-            [chat_history],  # wrap in list for single-dialogue
+            [chat_history],
             max_gen_len=max_gen_len,
             temperature=temperature,
             top_p=top_p,
         )[0]["generation"]["content"].strip()
 
-        # print and record professor’s reply
         print(f"\n💡 Professor: {result}\n")
         chat_history.append({"role": "assistant", "content": result})
         question_count += 1
 
-        # after 3 exchanges, ask a practice question and exit
+        # ── After 3 Q&A turns, generate the MCQ ──
+                # ── After 3 Q&A turns, generate the MCQ ──
         if question_count >= max_questions:
+            # 1) Ask for MCQ + answer key
             quiz_prompt = {
                 "role": "user",
                 "content": (
                     "📝 Practice Question:\n"
-                    "Generate a single multiple‑choice question about one of the topics we just covered. "
-                    "Provide exactly 4 options labeled A–D, each on its own line. Then insert two blank lines and "
-                    "write:\n\nAnswer: <letter>\nExplanation: <brief explanation>"
+                    "Generate exactly one multiple-choice question on a topic we covered, "
+                    "with 4 options labeled A–D (each on its own line). **AFTER** the choices, "
+                    "on a new line write `Answer: <letter>` and on the next line `Explanation: <brief explanation>`. "
+                    "We'll only show the question and choices to the student."
                 )
             }
             chat_history.append(quiz_prompt)
 
-            quiz = generator.chat_completion(
+            # 2) Retrieve the raw quiz (with key & explanation)
+            raw_quiz = generator.chat_completion(
                 [chat_history],
                 max_gen_len=max_gen_len,
                 temperature=temperature,
                 top_p=top_p,
             )[0]["generation"]["content"].strip()
-            # ── POST‑PROCESS TO ADD 5 BLANK LINES BEFORE “Answer:” ──
-            if "Answer:" in quiz:
-                before, after = quiz.split("Answer:", 1)
-                # ensure exactly 5 blank lines
-                quiz = before.rstrip() + "\n" * 6 + "Answer:" + after.strip()
 
-            print(f"\n📝 Quiz Time!\n\n{quiz}\n")
+            # 3) Parse out the student-facing question & the answer key
+            parts = raw_quiz.split("Answer:")
+            question_and_choices = parts[0].strip()
+            key_and_expl = parts[1].split("Explanation:")
+            answer_key = key_and_expl[0].strip()
+            explanation_key = key_and_expl[1].strip()
+
+            # 4) Record the full raw_quiz as the assistant turn
+            chat_history.append({"role": "assistant", "content": raw_quiz})
+
+            # 5) Show only the question & choices
+            print(f"\n📝 Quiz Time!\n\n{question_and_choices}\n")
+            print("👉 Please respond with **only** the letter (A, B, C, or D) of your choice.")
+
+            # 6) Read & validate the student’s choice (case‐insensitive)
+            while True:
+                raw = input("Your answer in lowercase: ").strip()
+                if raw and raw[0].upper() in ["A", "B", "C", "D"]:
+                    student_choice = raw[0].upper()
+                    break
+                print("Invalid choice. Please enter only A, B, C, or D.")
+
+            # 7) Build the grading prompt with the real key
+            grade_instruction = (
+                f"{student_choice}\n\n"
+                f"Correct answer: {answer_key}\n\n"
+                "Evaluate only the student’s answer. Respond **only** with 'Correct!' or 'Incorrect.' "
+                "followed by a brief explanation why it is correct or incorrect."
+            )
+            chat_history.append({"role": "user", "content": grade_instruction})
+
+            # 8) Get and print the grading feedback
+            grading = generator.chat_completion(
+                [chat_history],
+                max_gen_len=max_gen_len,
+                temperature=temperature,
+                top_p=top_p,
+            )[0]["generation"]["content"].strip()
+
+            print(f"\n💡 Professor: {grading}\n")
             break
+
+
 
 
 
